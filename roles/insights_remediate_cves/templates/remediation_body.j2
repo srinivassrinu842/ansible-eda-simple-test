@@ -1,9 +1,9 @@
 {
-  "name": "Remediate CVEs for {{ insights_adv_target_host | default('host') }} - Part {{ batch_idx | default(0) + 1 }} ({{ 999999 | random }})",
+  "name": "{{ insights_remediation_plan_name }}",
   "auto_reboot": true,
   "add": {
     "issues": [
-      {% for cve in item %}
+      {% for cve in all_cves_list | unique %}
       {
         "id": "vulnerabilities:{{ cve }}",
         "systems": [
