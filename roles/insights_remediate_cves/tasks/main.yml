@@ -1,4 +1,12 @@
 ---
+- name: Debug AAP connection variables
+  ansible.builtin.debug:
+    msg:
+      - "awx_host is {{ awx_host | default('undefined') }}"
+      - "tower_host is {{ tower_host | default('undefined') }}"
+      - "CONTROLLER_HOST env is {{ lookup('env', 'CONTROLLER_HOST') | default('undefined') }}"
+      - "TOWER_HOST env is {{ lookup('env', 'TOWER_HOST') | default('undefined') }}"
+
 - name: Get Token from Service Account
   no_log: true
   ansible.builtin.uri:
