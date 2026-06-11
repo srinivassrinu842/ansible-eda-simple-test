@@ -5,8 +5,8 @@ aap_project_name: "RedHat Insights"
 aap_inventory_name: "Insights Inventory"
 aap_credential_name: "Machine Creds"
 
-# AAP Controller connection settings (automatically retrieved from environment inside AAP)
-controller_host: "{{ lookup('env', 'CONTROLLER_HOST') | default(lookup('env', 'TOWER_HOST')) | default('') }}"
-controller_username: "{{ lookup('env', 'CONTROLLER_USERNAME') | default(lookup('env', 'TOWER_USERNAME')) | default('') }}"
-controller_password: "{{ lookup('env', 'CONTROLLER_PASSWORD') | default(lookup('env', 'TOWER_PASSWORD')) | default('') }}"
-controller_oath_token: "{{ lookup('env', 'CONTROLLER_OAUTH_TOKEN') | default(lookup('env', 'TOWER_OAUTH_TOKEN')) | default('') }}"
+# AAP Controller connection settings (looks for Ansible variables awx_host/tower_host injected by AAP, falling back to environment)
+controller_host: "{{ awx_host | default(tower_host) | default(lookup('env', 'CONTROLLER_HOST')) | default(lookup('env', 'TOWER_HOST')) | default('') }}"
+controller_username: "{{ awx_username | default(tower_username) | default(lookup('env', 'CONTROLLER_USERNAME')) | default(lookup('env', 'TOWER_USERNAME')) | default('') }}"
+controller_password: "{{ awx_password | default(tower_password) | default(lookup('env', 'CONTROLLER_PASSWORD')) | default(lookup('env', 'TOWER_PASSWORD')) | default('') }}"
+controller_oath_token: "{{ awx_oauth_token | default(tower_oauth_token) | default(lookup('env', 'CONTROLLER_OAUTH_TOKEN')) | default(lookup('env', 'TOWER_OAUTH_TOKEN')) | default('') }}"
