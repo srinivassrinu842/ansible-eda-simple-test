@@ -6,8 +6,8 @@
     method: POST
     body:
       grant_type: client_credentials
-      client_id: "{{ insights_auth_user }}"
-      client_secret: "{{ insights_auth_password }}"
+      client_id: "{{ insights_auth_user | default(lookup('env', 'REDHAT_USER')) | default(lookup('env', 'INSIGHTS_USER')) }}"
+      client_secret: "{{ insights_auth_password | default(lookup('env', 'REDHAT_PASSWORD')) | default(lookup('env', 'INSIGHTS_PASSWORD')) }}"
     body_format: form-urlencoded
     status_code: 200
   register: token
