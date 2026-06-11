@@ -4,6 +4,7 @@ sso_endpoint: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openi
 aap_project_name: "RedHat Insights"
 aap_inventory_name: "Insights Inventory"
 aap_credential_name: "Machine Creds"
+insights_cve_id: ""
 
 # AAP Controller connection settings (looks for Ansible variables awx_host/tower_host injected by AAP, falling back to environment)
 controller_host: "{{ awx_host | default(tower_host) | default(lookup('env', 'CONTROLLER_HOST')) | default(lookup('env', 'TOWER_HOST')) | default('') }}"
