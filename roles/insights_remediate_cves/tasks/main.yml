@@ -1,12 +1,4 @@
 ---
-- name: Debug AAP connection variables
-  ansible.builtin.debug:
-    msg:
-      - "awx_host is {{ awx_host | default('undefined') }}"
-      - "tower_host is {{ tower_host | default('undefined') }}"
-      - "CONTROLLER_HOST env is {{ lookup('env', 'CONTROLLER_HOST') | default('undefined') }}"
-      - "TOWER_HOST env is {{ lookup('env', 'TOWER_HOST') | default('undefined') }}"
-
 - name: Get Token from Service Account
   no_log: true
   ansible.builtin.uri:
@@ -19,6 +11,9 @@
     body_format: form-urlencoded
     status_code: 200
   register: token
+
+
+
 
 - name: Determine if single CVE remediation is requested
   ansible.builtin.set_fact:
@@ -159,6 +154,30 @@
   delegate_to: localhost
   when:
     - playbook_downloads.results is defined
+
+- name: Configure git user name
+  ansible.builtin.shell: |
+    git config user.name "AAP Automation"
+    git config user.email "aap-automation@redhat.com"
+  args:
+    chdir: "{{ playbook_dir }}"
+  delegate_to: localhost
+  when:
+    - github_token is defined
+    - github_token != ""
+
+- name: Commit and push generated playbook to Git repository
+  ansible.builtin.shell: |
+    git add "remediation-{{ insights_adv_target_host | default('host') }}.yml"
+    git commit -m "Add generated remediation playbook for {{ insights_adv_target_host | default('host') }} [skip ci]"
+    git push https://x-token-auth:{{ github_token }}@{{ github_repo_url }} HEAD:main
+  args:
+    chdir: "{{ playbook_dir }}"
+  delegate_to: localhost
+  no_log: true
+  when:
+    - github_token is defined
+    - github_token != ""
 
 - name: Sync the playbooks project in AAP Controller
   ansible.controller.project_update:
