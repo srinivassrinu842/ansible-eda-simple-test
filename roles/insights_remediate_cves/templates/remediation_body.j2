@@ -1,0 +1,16 @@
+{
+  "name": "Remediate CVEs for {{ insights_adv_target_host | default('host') }} - Part {{ batch_idx | default(0) + 1 }} ({{ 999999 | random }})",
+  "auto_reboot": true,
+  "add": {
+    "issues": [
+      {% for cve in item %}
+      {
+        "id": "vulnerabilities:{{ cve }}",
+        "systems": [
+          "{{ system_uuid }}"
+        ]
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ]
+  }
+}

@@ -1,0 +1,190 @@
+---
+- name: Get Token from Service Account
+  no_log: true
+  ansible.builtin.uri:
+    url: "{{ sso_endpoint }}"
+    method: POST
+    body:
+      grant_type: client_credentials
+      client_id: "{{ insights_auth_user }}"
+      client_secret: "{{ insights_auth_password }}"
+    body_format: form-urlencoded
+    status_code: 200
+  register: token
+
+- name: Determine if single CVE remediation is requested
+  ansible.builtin.set_fact:
+    all_cves_list: "{{ [insights_cve_id] }}"
+  when:
+    - insights_cve_id is defined
+    - insights_cve_id != ""
+
+- name: Determine system_uuid from insights_adv_host_data
+  ansible.builtin.set_fact:
+    system_uuid: "{{ insights_adv_host_data.inventory_id }}"
+  when:
+    - insights_adv_host_data is defined
+    - insights_adv_host_data.inventory_id is defined
+
+- name: Look up host by display name in Insights Inventory
+  ansible.builtin.uri:
+    url: "{{ insights_api_url }}/inventory/v1/hosts?display_name={{ insights_adv_target_host }}"
+    method: GET
+    headers:
+      Authorization: Bearer {{ token.json.access_token }}
+      Content-Type: application/json
+    status_code: 200
+  register: host_lookup
+  when:
+    - system_uuid is not defined or system_uuid == ""
+    - insights_adv_target_host is defined
+
+- name: Set system_uuid from lookup results
+  ansible.builtin.set_fact:
+    system_uuid: "{{ host_lookup.json.results[0].id }}"
+  when:
+    - host_lookup is defined
+    - host_lookup.json is defined
+    - host_lookup.json.results is defined
+    - host_lookup.json.results | length > 0
+
+- name: Retrieve Page 1 of CVEs from Vulnerability API
+  ansible.builtin.uri:
+    url: "{{ insights_api_url }}/vulnerability/v1/systems/{{ system_uuid }}/cves?limit=100&offset=0&advisory_available=true"
+    method: GET
+    headers:
+      Authorization: Bearer {{ token.json.access_token }}
+      Content-Type: application/json
+    status_code: 200
+  register: system_cves_first
+  when:
+    - system_uuid is defined
+    - system_uuid != ""
+    - all_cves_list is not defined
+
+- name: Retrieve subsequent pages of CVEs
+  ansible.builtin.uri:
+    url: "{{ insights_api_url }}/vulnerability/v1/systems/{{ system_uuid }}/cves?limit=100&offset={{ item }}&advisory_available=true"
+    method: GET
+    headers:
+      Authorization: Bearer {{ token.json.access_token }}
+      Content-Type: application/json
+    status_code: 200
+  register: system_cves_pages
+  loop: "{{ range(100, system_cves_first.json.meta.total_items | int, 100) | list }}"
+  when:
+    - system_uuid is defined
+    - system_uuid != ""
+    - system_cves_first is defined
+    - system_cves_first.json is defined
+    - system_cves_first.json.meta.total_items | int > 100
+    - all_cves_list is not defined
+
+- name: Compile list of all CVEs from Vulnerability API
+  ansible.builtin.set_fact:
+    all_cves_list: >-
+      {{
+        (system_cves_first.json.data | default([])) | map(attribute='id') | list +
+        (system_cves_pages.results | default([]) | selectattr('json', 'defined') | map(attribute='json.data') | flatten) | map(attribute='id') | list
+      }}
+  when:
+    - system_cves_first is defined
+    - system_cves_first.json is defined
+    - all_cves_list is not defined
+
+
+- name: Print the count of all applicable CVEs
+  ansible.builtin.debug:
+    msg: "Total applicable CVEs count for host {{ insights_adv_target_host | default('unknown') }}: {{ all_cves_list | default([]) | unique | length }}"
+  when:
+    - all_cves_list is defined
+
+- name: Generate playbooks in Insights in batches of 50
+  ansible.builtin.uri:
+    url: "{{ insights_api_url }}/remediations/v1/remediations"
+    method: POST
+    validate_certs: false
+    status_code: 201
+    return_content: true
+    headers:
+      Authorization: Bearer {{ token.json.access_token }}
+      Content-Type: application/json
+    body_format: json
+    body: "{{ lookup('ansible.builtin.template', 'templates/remediation_body.j2') }}"
+  register: remediation_responses
+  loop: "{{ all_cves_list | unique | batch(50) | list }}"
+  loop_control:
+    index_var: batch_idx
+  when:
+    - all_cves_list is defined
+    - all_cves_list | length > 0
+  delegate_to: localhost
+
+- name: Download the remediation playbooks (YAML) from Insights
+  ansible.builtin.uri:
+    url: "{{ insights_api_url }}/remediations/v1/remediations/{{ item.json.id }}/playbook"
+    method: GET
+    headers:
+      Authorization: Bearer {{ token.json.access_token }}
+      accept: "text/vnd.yaml"
+    status_code: 200
+    return_content: true
+  register: playbook_downloads
+  loop: "{{ remediation_responses.results }}"
+  loop_control:
+    label: "playbook-{{ item.json.id | default('unknown') }}"
+  when:
+    - remediation_responses.results is defined
+    - item.json is defined
+    - item.json.id is defined
+  delegate_to: localhost
+
+- name: Merge multiple playbooks into a single consolidated playbook
+  ansible.builtin.copy:
+    content: |
+      ---
+      {% for result in playbook_downloads.results %}
+      {{ result.content | regex_replace('^---', '') }}
+      {% endfor %}
+    dest: "{{ playbook_dir }}/remediation-{{ insights_adv_target_host | default('host') }}.yml"
+    mode: '0644'
+  delegate_to: localhost
+  when:
+    - playbook_downloads.results is defined
+
+- name: Sync the playbooks project in AAP Controller
+  ansible.controller.project_update:
+    project: "{{ aap_project_name }}"
+    timeout: 120
+    validate_certs: false
+  delegate_to: localhost
+  when:
+    - playbook_downloads.results is defined
+    - playbook_downloads.results | length > 0
+
+- name: Update Remediation Job Template in AAP Controller
+  ansible.controller.job_template:
+    name: "Insights Remediation"
+    job_type: "run"
+    credentials:
+      - "{{ aap_credential_name }}"
+    inventory: "{{ aap_inventory_name }}"
+    project: "{{ aap_project_name }}"
+    playbook: "remediation-{{ insights_adv_target_host | default('host') }}.yml"
+    become_enabled: true
+    state: present
+    validate_certs: false
+  delegate_to: localhost
+  when:
+    - playbook_downloads.results is defined
+    - playbook_downloads.results | length > 0
+
+- name: Launch Remediation Job Template in AAP Controller
+  ansible.controller.job_launch:
+    name: "Insights Remediation"
+    wait: true
+    validate_certs: false
+  delegate_to: localhost
+  when:
+    - playbook_downloads.results is defined
+    - playbook_downloads.results | length > 0

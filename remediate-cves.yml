@@ -1,0 +1,7 @@
+---
+- name: Remediate Host Vulnerabilities from Red Hat Insights
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  roles:
+    - role: insights_remediate_cves

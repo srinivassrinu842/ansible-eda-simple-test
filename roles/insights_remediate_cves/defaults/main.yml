@@ -1,0 +1,6 @@
+---
+insights_api_url: "https://console.redhat.com/api"
+sso_endpoint: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+aap_project_name: "Red Hat Insights"
+aap_inventory_name: "Shadowman Production"
+aap_credential_name: "Ansible Linux Service Account"
