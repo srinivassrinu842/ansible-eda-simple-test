@@ -22,6 +22,15 @@
     - insights_cve_id is defined
     - insights_cve_id != ""
 
+- name: Set job template name fact
+  ansible.builtin.set_fact:
+    remediation_template_name: >-
+      {{
+        (insights_cve_id ~ ' Remediation')
+        if (insights_cve_id is defined and insights_cve_id != '')
+        else ('Multiple CVEs Remediation - ' ~ (insights_adv_target_host | default('host')))
+      }}
+
 - name: Determine system_uuid from insights_adv_host_data
   ansible.builtin.set_fact:
     system_uuid: "{{ insights_adv_host_data.inventory_id }}"
@@ -193,7 +202,7 @@
 
 - name: Update Remediation Job Template in AAP Controller
   ansible.controller.job_template:
-    name: "Insights Remediation"
+    name: "{{ remediation_template_name }}"
     job_type: "run"
     credentials:
       - "{{ aap_credential_name }}"
@@ -212,7 +221,7 @@
 
 - name: Launch Remediation Job Template in AAP Controller
   ansible.controller.job_launch:
-    name: "Insights Remediation"
+    name: "{{ remediation_template_name }}"
     wait: true
     validate_certs: false
   delegate_to: localhost
