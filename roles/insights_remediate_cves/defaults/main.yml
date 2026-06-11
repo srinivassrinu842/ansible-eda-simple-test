@@ -1,6 +1,12 @@
 ---
 insights_api_url: "https://console.redhat.com/api"
 sso_endpoint: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
-aap_project_name: "Red Hat Insights"
-aap_inventory_name: "Shadowman Production"
-aap_credential_name: "Ansible Linux Service Account"
+aap_project_name: "RedHat Insights"
+aap_inventory_name: "Insights Inventory"
+aap_credential_name: "Machine Creds"
+
+# AAP Controller connection settings (automatically retrieved from environment inside AAP)
+controller_host: "{{ lookup('env', 'CONTROLLER_HOST') | default(lookup('env', 'TOWER_HOST')) | default('') }}"
+controller_username: "{{ lookup('env', 'CONTROLLER_USERNAME') | default(lookup('env', 'TOWER_USERNAME')) | default('') }}"
+controller_password: "{{ lookup('env', 'CONTROLLER_PASSWORD') | default(lookup('env', 'TOWER_PASSWORD')) | default('') }}"
+controller_oath_token: "{{ lookup('env', 'CONTROLLER_OAUTH_TOKEN') | default(lookup('env', 'TOWER_OAUTH_TOKEN')) | default('') }}"

@@ -161,6 +161,8 @@
   when:
     - playbook_downloads.results is defined
     - playbook_downloads.results | length > 0
+    - controller_host is defined
+    - controller_host != ""
 
 - name: Update Remediation Job Template in AAP Controller
   ansible.controller.job_template:
@@ -178,6 +180,8 @@
   when:
     - playbook_downloads.results is defined
     - playbook_downloads.results | length > 0
+    - controller_host is defined
+    - controller_host != ""
 
 - name: Launch Remediation Job Template in AAP Controller
   ansible.controller.job_launch:
@@ -188,3 +192,5 @@
   when:
     - playbook_downloads.results is defined
     - playbook_downloads.results | length > 0
+    - controller_host is defined
+    - controller_host != ""
