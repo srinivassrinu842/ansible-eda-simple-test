@@ -1,0 +1,8 @@
+---
+- name: Simple EDA Playbook Test
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Log EDA trigger event
+      ansible.builtin.debug:
+        msg: "Event received by EDA! Payload details: {{ ansible_eda.event.payload | default(ansible_eda) | default('No payload detected') }}"
